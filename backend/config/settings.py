@@ -1,7 +1,7 @@
 """Django settings for Ajaia Docs.
 
 All environment-specific values come from environment variables so the same
-code runs locally (SQLite, DEBUG on) and on Render (Postgres on Neon, DEBUG off).
+code runs locally (DEBUG on) and on PythonAnywhere (DEBUG off), both on SQLite by default.
 See ../.env.example for the full list.
 """
 
@@ -21,7 +21,7 @@ def load_env_local(path: Path) -> None:
     Only when DJANGO_USE_ENV_LOCAL=1. Local development defaults to SQLite: a new TLS
     connection to Neon (us-east-2) takes several seconds from here and the dev server opens
     one per request thread, and local experiments should not land in the data reviewers see.
-    Real environment variables always win (Render sets DATABASE_URL in its dashboard), and the
+    Real environment variables always win, and the
     file is gitignored. Tests never load it (config/test_settings.py).
     """
     if os.environ.get("DJANGO_IGNORE_ENV_LOCAL") or not env_bool("DJANGO_USE_ENV_LOCAL") or not path.is_file():
@@ -60,8 +60,6 @@ if not SECRET_KEY:
         raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG is off.")
 
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1" if DEBUG else "")
-if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):  # set automatically by Render
-    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
 
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -92,9 +90,9 @@ TEMPLATES = [
 ]
 
 # --- Database ---------------------------------------------------------------
-# Local tests: SQLite. Otherwise Neon Postgres. Prefer Neon's direct (unpooled) URL: Django
-# keeps its own persistent connections, and PgBouncer transaction pooling breaks server-side
-# cursors. On Render, set DATABASE_URL to the direct URL.
+# Default: SQLite (local dev, tests, and the PythonAnywhere deployment). Optional Postgres via
+# DATABASE_URL; for Neon prefer the direct (unpooled) URL, since PgBouncer transaction pooling
+# breaks server-side cursors.
 DATABASE_URL = os.environ.get("DATABASE_URL_UNPOOLED") or os.environ.get("DATABASE_URL", "")
 if DATABASE_URL:
     DATABASES = {
@@ -154,7 +152,7 @@ CORS_ALLOW_CREDENTIALS = False
 
 # --- Security (production) --------------------------------------------------
 if not DEBUG:
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # Render terminates TLS
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # TLS terminates at the host
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
     SECURE_REDIRECT_EXEMPT = [r"^api/health/$"]  # platform health checks hit plain HTTP
     SECURE_HSTS_SECONDS = 3600
@@ -165,7 +163,7 @@ if not DEBUG:
 SILENCED_SYSTEM_CHECKS = [
     # No cookie/session authentication exists (Bearer header only), so there is no CSRF surface.
     "security.W003",
-    # HSTS includeSubDomains/preload are not ours to set on a shared *.onrender.com hostname.
+    # HSTS includeSubDomains/preload are not ours to set on a shared *.pythonanywhere.com host.
     "security.W005",
     "security.W021",
 ]

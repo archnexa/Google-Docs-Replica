@@ -19,7 +19,7 @@ os.environ["DJANGO_SETTINGS_MODULE"] = "config.settings"
 os.environ["DEBUG"] = "0"
 os.environ["SECRET_KEY"] = "<paste a long random secret>"
 os.environ["ALLOWED_HOSTS"] = f"{USERNAME}.pythonanywhere.com"
-os.environ["CORS_ALLOWED_ORIGINS"] = "https://<your-site>.netlify.app"
+os.environ["CORS_ALLOWED_ORIGINS"] = "https://googledocsreplica.netlify.app"
 # HTTPS is enforced by PythonAnywhere's "Force HTTPS" switch on the Web tab.
 os.environ["SECURE_SSL_REDIRECT"] = "0"
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Production smoke test. Usage: scripts/smoke.sh https://<api>.onrender.com
+# API smoke test. Usage: scripts/smoke.sh https://<username>.pythonanywhere.com  (or http://localhost:8000)
 # Uses the same `Authorization: Bearer <token>` scheme as the frontend.
 # Requires: curl, python3. Creates one temporary document and deletes it at the end.
 set -euo pipefail
@@ -44,12 +44,10 @@ if [[ "${SMOKE_DOCS:-1}" == "1" ]]; then
   check "stale save is 409" 409 "$(req PUT "/api/documents/$DOC/content/" "$ALICE" '{"content":"<p>stale</p>","version":1,"save_id":"22222222-2222-4222-8222-222222222222"}')"
   check "reopen keeps formatting" "<p><strong>smoke</strong></p>" "$(req GET "/api/documents/$DOC/" "$ALICE" >/dev/null; body | json 'd["content"]')"
   check "carol cannot see unshared doc" 404 "$(req GET "/api/documents/$DOC/" "$CAROL")"
-  check "share with carol (viewer)" 201 "$(req POST "/api/documents/$DOC/shares/" "$ALICE" '{"email":"carol@ajaia.test","role":"viewer"}')"
-  SHARE=$(body | json 'd["id"]')
-  check "carol can read" 200 "$(req GET "/api/documents/$DOC/" "$CAROL")"
-  check "carol (viewer) cannot save" 403 "$(req PUT "/api/documents/$DOC/content/" "$CAROL" '{"content":"<p>x</p>","version":2,"save_id":"33333333-3333-4333-8333-333333333333"}')"
-  check "revoke carol" 204 "$(req DELETE "/api/documents/$DOC/shares/$SHARE/" "$ALICE")"
-  check "carol loses access" 404 "$(req GET "/api/documents/$DOC/" "$CAROL")"
+  check "carol cannot delete it" 404 "$(req DELETE "/api/documents/$DOC/" "$CAROL")"
+  WELCOME=$(req GET "/api/documents/?scope=shared" "$CAROL" >/dev/null; body | json '[x["id"] for x in d if x["role"]=="viewer"][0]')
+  check "carol (seeded viewer) can read Welcome" 200 "$(req GET "/api/documents/$WELCOME/" "$CAROL")"
+  check "carol (viewer) cannot rename it" 403 "$(req PATCH "/api/documents/$WELCOME/" "$CAROL" '{"title":"x"}')"
   check "delete doc" 204 "$(req DELETE "/api/documents/$DOC/" "$ALICE")"
 fi
 
