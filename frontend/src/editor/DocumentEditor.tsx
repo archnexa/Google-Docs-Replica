@@ -4,7 +4,8 @@ import StarterKit from '@tiptap/starter-kit'
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { DocumentDetail } from '../api/types'
-import { useAuth } from '../auth/useAuth'
+import { Icon } from '../components/Icon'
+import { ThemeSwitcher } from '../components/ThemeSwitcher'
 import { SaveStatus } from './SaveStatus'
 import { TitleField } from './TitleField'
 import { Toolbar } from './Toolbar'
@@ -19,7 +20,6 @@ const extensions = [
 ]
 
 export function DocumentEditor({ doc }: { doc: DocumentDetail }) {
-  const { user } = useAuth()
   const readOnly = doc.role === 'viewer'
   const { controller, snapshot } = useDocumentAutosave(doc.id, doc.version, doc.content)
   useBeforeUnload(controller)
@@ -35,6 +35,7 @@ export function DocumentEditor({ doc }: { doc: DocumentDetail }) {
     extensions,
     content: doc.content, // initial content: does not emit onUpdate -> no save on load
     editable: !readOnly,
+    editorProps: { attributes: { role: 'textbox', 'aria-label': 'Document content', 'aria-multiline': 'true', 'aria-readonly': String(readOnly) } },
     immediatelyRender: true,
     shouldRerenderOnTransaction: false,
     onUpdate: ({ editor: e }) => {
@@ -45,6 +46,7 @@ export function DocumentEditor({ doc }: { doc: DocumentDetail }) {
 
   useEffect(() => {
     document.title = `${doc.title} — Ajaia Docs`
+    return () => { document.title = 'Ajaia Docs' }
   }, [doc.title])
 
   // Cmd/Ctrl+S saves immediately instead of opening the browser's "save page" dialog.
@@ -62,24 +64,26 @@ export function DocumentEditor({ doc }: { doc: DocumentDetail }) {
   const isOwner = doc.role === 'owner'
   return (
     <div className="editor-page">
-      <div className="editor-top">
+      <header className="editor-top">
         <div className="editor-head">
-          <Link to="/" className="brand" title="Back to documents" aria-label="Back to documents">
-            <span className="brand-mark" aria-hidden>
-              A
-            </span>
+          <Link to="/" className="editor-back brand-mark" title="Back to documents" aria-label="Back to documents">
+            <Icon name="arrowLeft" size={21} />
           </Link>
-          <TitleField docId={doc.id} initial={doc.title} readOnly={readOnly} />
-          <SaveStatus snap={snapshot} readOnly={readOnly} />
-          <span className={`tag tag-${doc.role}`} title={isOwner ? 'You own this document' : `Owned by ${doc.owner.name}`}>
-            {isOwner ? 'owner' : `${doc.role} · ${doc.owner.name}'s doc`}
-          </span>
-          <span className="user-chip">{user?.name}</span>
+          <div className="editor-document">
+            <TitleField docId={doc.id} initial={doc.title} readOnly={readOnly} />
+            <div className="editor-meta">
+              <SaveStatus snap={snapshot} readOnly={readOnly} />
+              <span className={`tag tag-${doc.role}`} title={isOwner ? 'You own this document' : `Owned by ${doc.owner.name}`}>
+                {doc.role}
+              </span>
+            </div>
+          </div>
+          <ThemeSwitcher />
         </div>
         {!readOnly && editor && <Toolbar editor={editor} />}
-      </div>
+      </header>
 
-      <div className="editor-canvas">
+      <main className="editor-canvas" aria-label="Document">
         {readOnly && (
           <div className="alert alert-info" role="note">
             You have view-only access. Ask {doc.owner.name} for edit access to make changes.
@@ -88,7 +92,7 @@ export function DocumentEditor({ doc }: { doc: DocumentDetail }) {
         <div className={`paper${readOnly ? ' readonly' : ''}`}>
           <EditorContent editor={editor} />
         </div>
-      </div>
+      </main>
     </div>
   )
 }

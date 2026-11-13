@@ -1,26 +1,20 @@
-import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
+import { Brand } from './Brand'
+import { Icon } from './Icon'
+import { ThemeSwitcher } from './ThemeSwitcher'
 
 export function TopBar() {
   const { user, logout } = useAuth()
   return (
     <header className="topbar">
-      <Link to="/" className="brand">
-        <span className="brand-mark" aria-hidden>
-          A
-        </span>
-        Ajaia Docs
-      </Link>
+      <Brand />
       <div className="spacer" />
+      <ThemeSwitcher />
       {user && (
-        <>
-          <span className="user-chip" title={user.email}>
-            {user.name}
-          </span>
-          <button className="btn btn-sm" onClick={() => void logout()}>
-            Sign out
-          </button>
-        </>
+        <button className="btn btn-sm" onClick={() => void logout()} aria-label="Sign out" title="Sign out">
+          <Icon name="logout" size={17} />
+          <span className="topbar-signout-label">Sign out</span>
+        </button>
       )}
     </header>
   )

@@ -4,7 +4,11 @@ import { ApiError } from '../api/client'
 import { api } from '../api/endpoints'
 import type { DocumentSummary } from '../api/types'
 import { ConfirmDialog } from '../components/Modal'
-import { TopBar } from '../components/TopBar'
+import { useAuth } from '../auth/useAuth'
+import { Brand } from '../components/Brand'
+import { Icon } from '../components/Icon'
+import { ThemeSwitcher } from '../components/ThemeSwitcher'
+import { WorkspaceArt } from '../components/WorkspaceArt'
 import { relativeTime } from '../lib/format'
 
 type Scope = 'owned' | 'shared'
@@ -17,7 +21,9 @@ type ListState =
 type Loaded = { key: string } & ({ docs: DocumentSummary[] } | { error: string })
 
 export default function DashboardPage() {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
+  const { user, logout } = useAuth()
+  const [search, setSearch] = useState('')
   const scope: Scope = params.get('tab') === 'shared' ? 'shared' : 'owned'
   const [reloadKey, setReloadKey] = useState(0)
   const requestKey = `${scope}:${reloadKey}`
@@ -35,7 +41,9 @@ export default function DashboardPage() {
     const ctrl = new AbortController()
     api
       .listDocuments(scope, ctrl.signal)
-      .then((docs) => setLoaded({ key: requestKey, docs }))
+      .then((docs) => {
+        if (!ctrl.signal.aborted) setLoaded({ key: requestKey, docs })
+      })
       .catch((err) => {
         if (ctrl.signal.aborted) return
         setLoaded({ key: requestKey, error: err instanceof ApiError ? err.message : 'Could not load documents.' })
@@ -78,101 +86,153 @@ export default function DashboardPage() {
     }
   }
 
-  return (
-    <>
-      <TopBar />
-      <main className="dashboard">
-        <div className="dash-head">
-          <h1>Documents</h1>
-          <button className="btn btn-primary" onClick={createDoc} disabled={creating}>
-            {creating ? 'Creating…' : '+ New document'}
-          </button>
-        </div>
+  const owned = scope === 'owned'
+  const section = owned ? 'My documents' : 'Shared with me'
+  const searchTerm = search.trim().toLowerCase()
+  const visibleDocs = list.status === 'ready'
+    ? list.docs.filter((doc) => doc.title.toLowerCase().includes(searchTerm))
+    : []
+  const initials = user?.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
 
-        {actionError && (
-          <div className="alert alert-error" role="alert">
-            {actionError}
+  return (
+    <div className="workspace">
+      <aside className="workspace-sidebar" aria-label="Workspace navigation">
+        <Brand />
+        <nav className="workspace-nav" aria-label="Document lists">
+          <span className="nav-label" aria-hidden="true">Workspace</span>
+          <Link
+            to="/"
+            replace
+            className="nav-item"
+            aria-current={owned ? 'page' : false}
+            onClick={() => setSearch('')}
+          >
+            <Icon name="folder" /> My documents
+          </Link>
+          <Link
+            to="/?tab=shared"
+            replace
+            className="nav-item"
+            aria-current={owned ? false : 'page'}
+            onClick={() => setSearch('')}
+          >
+            <Icon name="people" /> Shared with me
+          </Link>
+        </nav>
+        {user && (
+          <div className="workspace-account">
+            <span className="avatar" aria-hidden="true">{initials || '?'}</span>
+            <div className="account-info">
+              <strong>{user.name}</strong>
+              <span title={user.email}>{user.email}</span>
+            </div>
+            <button className="icon-button signout" onClick={() => void logout()} aria-label="Sign out" title="Sign out">
+              <Icon name="logout" size={18} />
+            </button>
           </div>
         )}
+      </aside>
 
-        <div className="tabs" role="tablist" aria-label="Document lists">
-          <button
-            className="tab"
-            role="tab"
-            aria-selected={scope === 'owned'}
-            onClick={() => setParams({}, { replace: true })}
-          >
-            My documents
-          </button>
-          <button
-            className="tab"
-            role="tab"
-            aria-selected={scope === 'shared'}
-            onClick={() => setParams({ tab: 'shared' }, { replace: true })}
-          >
-            Shared with me
-          </button>
-        </div>
+      <div className="workspace-body">
+        <header className="workspace-header">
+          <div className="breadcrumb">
+            <span>Workspace</span><Icon name="chevron" size={14} /><strong>{section}</strong>
+          </div>
+          <ThemeSwitcher />
+        </header>
 
-        <div role="tabpanel">
-          {list.status === 'loading' && <div className="empty">Loading…</div>}
-          {list.status === 'error' && (
-            <div className="alert alert-error" role="alert">
-              {list.message}
-              <div className="actions">
-                <button className="btn btn-sm" onClick={reload}>
-                  Try again
-                </button>
+        <main className="dashboard">
+          <section className="workspace-hero" aria-labelledby="workspace-heading">
+            <div className="hero-content">
+              <h1 id="workspace-heading">Your workspace<span>.</span></h1>
+              <p>Write, edit, and find your documents in one place.</p>
+              <button className="btn btn-primary hero-action" onClick={createDoc} disabled={creating}>
+                <Icon name="plus" size={19} /> {creating ? 'Creating…' : 'New document'}
+              </button>
+            </div>
+            <WorkspaceArt />
+          </section>
+
+          {actionError && <div className="alert alert-error" role="alert">{actionError}</div>}
+
+          <section className="document-section" aria-labelledby="document-heading">
+            <div className="dash-head">
+              <div>
+                <h2 id="document-heading">{section}</h2>
+                {list.status === 'ready' && (
+                  <p>{list.docs.length} {list.docs.length === 1 ? 'document' : 'documents'}</p>
+                )}
+              </div>
+              <div className="document-search" role="search">
+                <Icon name="search" size={18} />
+                <input
+                  type="search"
+                  aria-label="Search documents"
+                  placeholder="Search documents…"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
               </div>
             </div>
-          )}
-          {list.status === 'ready' && list.docs.length === 0 && (
-            <div className="empty">
-              {scope === 'owned' ? (
-                <>
-                  <p>You don't have any documents yet.</p>
-                  <button className="btn btn-primary" onClick={createDoc} disabled={creating}>
-                    Create your first document
-                  </button>
-                </>
-              ) : (
-                <p>Nothing has been shared with you yet.</p>
-              )}
-            </div>
-          )}
-          {list.status === 'ready' && list.docs.length > 0 && (
-            <ul className="doc-list">
-              {list.docs.map((doc) => (
-                <li key={doc.id} className="doc-row">
-                  <span className="doc-icon" aria-hidden />
-                  <div className="doc-main">
-                    <Link className="doc-title" to={`/d/${doc.id}`}>
-                      {doc.title}
+            {list.status === 'loading' && (
+              <div className="empty" role="status"><span className="spinner" /> Loading documents…</div>
+            )}
+            {list.status === 'error' && (
+              <div className="alert alert-error" role="alert">
+                {list.message}
+                <div className="actions"><button className="btn btn-sm" onClick={reload}>Try again</button></div>
+              </div>
+            )}
+            {list.status === 'ready' && visibleDocs.length === 0 && (
+              <div className="empty">
+                <span className="empty-icon"><Icon name={searchTerm ? 'search' : owned ? 'document' : 'people'} size={24} /></span>
+                <h3>{searchTerm ? 'No matching documents' : owned ? 'No documents yet' : 'Nothing shared yet'}</h3>
+                <p>
+                  {searchTerm
+                    ? 'Try searching for a different title.'
+                    : owned
+                      ? 'Start with a blank page and make it yours.'
+                      : 'Documents shared with you will appear here.'}
+                </p>
+                {searchTerm && <button className="btn" onClick={() => setSearch('')}>Clear search</button>}
+              </div>
+            )}
+            {visibleDocs.length > 0 && (
+              <ul className="doc-list">
+                {visibleDocs.map((doc) => (
+                  <li key={doc.id} className="doc-row">
+                    <Link className="doc-link" to={`/d/${doc.id}`}>
+                      <span className="doc-icon"><Icon name="document" size={20} /></span>
+                      <div className="doc-main">
+                        <span className="doc-title">{doc.title}</span>
+                        <span className="doc-meta">
+                          {!owned && `Owned by ${doc.owner.name} · `}
+                          Edited {relativeTime(doc.updated_at)}
+                        </span>
+                      </div>
+                      <span className={`tag tag-${doc.role}`}>{doc.role}</span>
+                      <span className="doc-open"><Icon name="chevron" size={18} /></span>
                     </Link>
-                    <div className="doc-meta">
-                      {scope === 'shared' ? `Owned by ${doc.owner.name} · ` : ''}
-                      Edited {relativeTime(doc.updated_at)}
-                    </div>
-                  </div>
-                  <span className={`tag tag-${doc.role}`}>{doc.role}</span>
-                  {doc.role === 'owner' && (
-                    <button
-                      className="btn btn-sm btn-ghost btn-danger"
-                      onClick={() => {
-                        setDeleteError(null)
-                        setToDelete(doc)
-                      }}
-                      aria-label={`Delete ${doc.title}`}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </main>
+                    {doc.role === 'owner' && (
+                      <button
+                        className="icon-button delete-doc"
+                        onClick={() => {
+                          setDeleteError(null)
+                          setToDelete(doc)
+                        }}
+                        aria-label={`Delete ${doc.title}`}
+                        title="Delete document"
+                      >
+                        <Icon name="trash" size={18} />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </main>
+      </div>
 
       {toDelete && (
         <ConfirmDialog
@@ -190,6 +250,6 @@ export default function DashboardPage() {
           onCancel={() => setToDelete(null)}
         />
       )}
-    </>
+    </div>
   )
 }

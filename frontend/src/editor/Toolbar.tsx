@@ -1,4 +1,5 @@
 import { useEditorState, type Editor } from '@tiptap/react'
+import { Icon } from '../components/Icon'
 
 type Block = 'p' | 'h1' | 'h2' | 'h3'
 
@@ -35,10 +36,10 @@ export function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boole
   return (
     <div className="toolbar" role="toolbar" aria-label="Formatting">
       <button className="tool" type="button" onClick={() => chain().undo().run()} disabled={disabled || !s.canUndo} title={`Undo (${mod}Z)`} aria-label="Undo">
-        ↶
+        <Icon name="undo" size={17} />
       </button>
       <button className="tool" type="button" onClick={() => chain().redo().run()} disabled={disabled || !s.canRedo} title={`Redo (${mod}Shift+Z)`} aria-label="Redo">
-        ↷
+        <Icon name="redo" size={17} />
       </button>
       <span className="tool-sep" />
       <label className="sr-only" htmlFor="block-style">
@@ -52,20 +53,20 @@ export function Toolbar({ editor, disabled }: { editor: Editor; disabled?: boole
       </select>
       <span className="tool-sep" />
       <button className="tool" type="button" aria-pressed={s.bold} onClick={() => chain().toggleBold().run()} disabled={disabled} title={`Bold (${mod}B)`} aria-label="Bold">
-        <strong>B</strong>
+        <Icon name="bold" size={17} />
       </button>
       <button className="tool" type="button" aria-pressed={s.italic} onClick={() => chain().toggleItalic().run()} disabled={disabled} title={`Italic (${mod}I)`} aria-label="Italic">
-        <em>I</em>
+        <Icon name="italic" size={17} />
       </button>
       <button className="tool" type="button" aria-pressed={s.underline} onClick={() => chain().toggleUnderline().run()} disabled={disabled} title={`Underline (${mod}U)`} aria-label="Underline">
-        <u>U</u>
+        <Icon name="underline" size={17} />
       </button>
       <span className="tool-sep" />
       <button className="tool" type="button" aria-pressed={s.bullet} onClick={() => chain().toggleBulletList().run()} disabled={disabled} title="Bulleted list" aria-label="Bulleted list">
-        • List
+        <Icon name="bullets" size={17} />
       </button>
       <button className="tool" type="button" aria-pressed={s.ordered} onClick={() => chain().toggleOrderedList().run()} disabled={disabled} title="Numbered list" aria-label="Numbered list">
-        1. List
+        <Icon name="numbers" size={17} />
       </button>
     </div>
   )
