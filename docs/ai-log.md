@@ -102,3 +102,57 @@ Verified (commands actually run):
 - `migrate --plan` / `migrate` / `seed_demo` on Neon production branch → OK; 2 demo docs.
 - `/api/health/` via local server on Neon → ok, `migrations_pending: false`; smoke auth subset 6/6.
 - Connection strings were never printed (all CLI output passed through a redaction filter).
+
+## M3 — Document API, permissions, dashboard
+
+Generated: `access.py` (single access rule, 404 vs 403), `services.py` (authorize + write in one
+transaction under `select_for_update`; content CAS; rename LWW; owner delete), serializers,
+views, dashboard (tabs, create, delete-with-confirm, empty/loading/error), modal/confirm dialog,
+tests: access matrix (20 cases), documents, concurrency, save-retry idempotency, sanitization.
+
+Changed / rejected during review:
+- Sanitizer round-trip test failed: nh3 re-orders link attributes (`rel` after `href`). The
+  fixture had been written from memory → replaced with HTML captured from the real installed
+  Tiptap 3.33.1 (`editor.getHTML()` in jsdom); test now compares tags/attribute-sets/text, plus a
+  byte-identical check for everything except links.
+- Suite took 38 s (PBKDF2 for every test user) → MD5 hasher in test settings only (0.4 s).
+- Lint caught `setState` synchronously inside the list effect → loading state is now derived
+  from a request key.
+- Removed an unused `visible_documents_q` helper the first draft included.
+
+Verified (actually run): `pytest` 87 passed on SQLite and on local PostgreSQL 18; manual API run
+(create → save → stale save 409 with current version → reopen sanitized → stranger 404 → rename
+keeps version → delete) via the Vite proxy.
+
+Incident while verifying against Neon (reported, not hidden):
+- Requests intermittently hung. Root causes found by measurement: a new TLS connection to Neon
+  (us-east-2) takes 2–7 s from this machine and Django's threaded dev server opens one per request;
+  a ~90-min-old Vite process had also stopped proxying. While restarting, an over-broad
+  `kill $(lsof -ti tcp:8000)` also killed Vite (it matched Vite's client socket) → now only
+  LISTEN sockets are targeted.
+- Decision: local dev defaults to SQLite; Neon is opt-in (`DJANGO_USE_ENV_LOCAL=1`). Render API
+  pinned to `region: ohio` (same AWS region as Neon). A leftover "M3 check" doc created on Neon by
+  the interrupted run was deleted.
+
+## M4a — Minimum working editor
+
+Generated: `SaveController` (full state machine: debounce + max-wait, single flight + follow-up,
+local/saved revisions, CAS version tracking, identical-attempt retries with capped backoff,
+conflict / blocked states, navigation-leave states, dispose), `useDocumentAutosave`, toolbar,
+honest save-status pill, title field (LWW), editor page (load-then-create), viewer read-only,
+Cmd/Ctrl+S, beforeunload guard. Tests: 20 SaveController unit tests (fake timers), 3 component
+tests mounting the real Tiptap editor (no save on load; one save per edit at loaded version;
+viewer read-only).
+
+Changed / rejected during review:
+- Mutation check: deliberately removed the follow-up save, then the identical-attempt retry —
+  tests failed (2 and 1 respectively), confirming they guard those behaviours; code restored.
+- Component test first used `editor.chain().focus()` → crashed in jsdom (no layout APIs);
+  switched to inserting at a position (test-environment issue, not an app bug).
+- Bundle was 740 KB → editor route lazy-loaded (initial 327 KB, editor chunk 415 KB).
+- `useDocumentAutosave` keeps a lint suppression for `setState` in an effect, with a written
+  reason: the controller must be created per mount so StrictMode never reuses a disposed one.
+
+Verified (actually run): `npm test` 23 passed, `npm run lint` clean, `npm run build` OK.
+Not yet verified in a real browser by the AI (no browser tool in this session) — left for the
+candidate's manual check.

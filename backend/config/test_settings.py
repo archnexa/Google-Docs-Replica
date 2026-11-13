@@ -12,3 +12,6 @@ os.environ.setdefault("DEBUG", "1")
 os.environ["DJANGO_IGNORE_ENV_LOCAL"] = "1"
 
 from config.settings import *  # noqa: E402,F401,F403
+
+# Fast hashing: tests create several users each; production keeps Django's default PBKDF2.
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

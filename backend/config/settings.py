@@ -16,13 +16,15 @@ REPO_ROOT = BASE_DIR.parent
 
 
 def load_env_local(path: Path) -> None:
-    """Load KEY=VALUE pairs from the repo-root `.env.local` written by `neon deploy`.
+    """Opt-in: load KEY=VALUE pairs from the repo-root `.env.local` written by `neon deploy`.
 
-    Real environment variables always win (Render sets them in its dashboard), and the
-    file is gitignored. Tests opt out via DJANGO_IGNORE_ENV_LOCAL so they never touch Neon
-    unless DATABASE_URL is exported explicitly.
+    Only when DJANGO_USE_ENV_LOCAL=1. Local development defaults to SQLite: a new TLS
+    connection to Neon (us-east-2) takes several seconds from here and the dev server opens
+    one per request thread, and local experiments should not land in the data reviewers see.
+    Real environment variables always win (Render sets DATABASE_URL in its dashboard), and the
+    file is gitignored. Tests never load it (config/test_settings.py).
     """
-    if os.environ.get("DJANGO_IGNORE_ENV_LOCAL") or not path.is_file():
+    if os.environ.get("DJANGO_IGNORE_ENV_LOCAL") or not env_bool("DJANGO_USE_ENV_LOCAL") or not path.is_file():
         return
     explicit_db = "DATABASE_URL" in os.environ  # an exported DATABASE_URL must not be overridden
     for line in path.read_text().splitlines():
@@ -36,8 +38,6 @@ def load_env_local(path: Path) -> None:
         os.environ.setdefault(key, value.strip().strip("'\""))
 
 
-load_env_local(REPO_ROOT / ".env.local")
-
 
 def env_bool(name: str, default: bool = False) -> bool:
     return os.environ.get(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
@@ -45,6 +45,9 @@ def env_bool(name: str, default: bool = False) -> bool:
 
 def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
+
+
+load_env_local(REPO_ROOT / ".env.local")
 
 
 DEBUG = env_bool("DEBUG", default=False)

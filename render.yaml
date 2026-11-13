@@ -13,6 +13,7 @@ services:
     name: ajaia-docs-api
     runtime: python
     plan: free
+    region: ohio  # same AWS region as the Neon database (us-east-2)
     rootDir: backend
     buildCommand: >-
       pip install -r requirements.txt &&
